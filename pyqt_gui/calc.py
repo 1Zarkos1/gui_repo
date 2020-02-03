@@ -4,56 +4,63 @@ from functools import partial
 
 from PyQt5.QtWidgets import (QApplication, QShortcut, QLabel, QPushButton,
                              QGridLayout, QWidget, QMainWindow, QLineEdit,
-                             QVBoxLayout)
+                             QVBoxLayout, QLineEdit)
 
 
 class MyWindow(QMainWindow):
     def __init__(self, parent=None):
         super(MyWindow, self).__init__(parent)
         self.setGeometry(0, 0, 200, 300)
-        self.setWindowTitle('Img window')
-        self.buttons = [
+        self.setWindowTitle('PyQt5 calculator')
+        self.buttonsText = [
+            '<-', '=', '+',
             '/', '*', '-',
             '7', '8', '9',
             '4', '5', '6',
             '1', '2', '3',
-            'c', '0', '+'
+            'c', '0', '.'
         ]
         self.col_num = 3
         self.operators = {'+': operator.add, '-': operator.sub,
                           '/': operator.truediv, '*': operator.mul}
         self.operand = ''
         self.operator = ''
-        self.answer = ''
         self.setUI()
 
     def setUI(self):
-        cenWidg = QWidget(self)
-        vbLay = QVBoxLayout(cenWidg)
-        layerWidg = QWidget()
-        grLay = QGridLayout(layerWidg)
-        ansLabel = QLabel()
-        ansLabel.setText('<h2>0</h2>')
-        layerWidg.setLayout(grLay)
-        vbLay.addWidget(ansLabel)
-        vbLay.addWidget(layerWidg)
-        self.ansLabel = ansLabel
-        self.buttons1 = [QPushButton(item) for item in self.buttons]
-        for i, button in enumerate(self.buttons1):
-            button.clicked.connect(partial(self.check_but, button.text()))
-            grLay.addWidget(button, i//3, i % 3)
-        self.setCentralWidget(cenWidg)
+        # initialize widgets and layouts
+        cenWidget = QWidget(self)
+        vertLayout = QVBoxLayout(cenWidget)
+        gridWidget = QWidget()
+        gridLayout = QGridLayout(gridWidget)
+        self.answerField = QLabel(parent=cenWidget)
+        self.textField = QLineEdit()
+        f = self.textField.font()
+        f.setPointSize(18)
+        self.textField.setFont(f)
+        gridWidget.setLayout(gridLayout)
+        # add widgets to top level layout
+        vertLayout.addWidget(self.answerField)
+        vertLayout.addWidget(self.textField)
+        vertLayout.addWidget(gridWidget)
+        # add buttons to grid layout
+        self.buttonInstances = [QPushButton(item) for item in self.buttonsText]
+        for i, button in enumerate(self.buttonInstances):
+            button.clicked.connect(partial(self.doMath, button.text()))
+            gridLayout.addWidget(button, i//self.col_num, i % self.col_num)
 
-    def check_but(self, but):
-        if but == 'c':
+        self.setCentralWidget(cenWidget)
+
+    def doMath(self, buttonValue):
+        if buttonValue == 'c':
             self.operand = ''
             self.operator = ''
-            self.answer = ''
-        elif but in self.operators:
-            self.operator = but
+            self.textField.setText('')
+        elif buttonValue in self.operators:
+            self.operator = buttonValue
         else:
-            self.operand += but
-        self.ansLabel.setText(f'<h2>{self.operand + self.operator}</h2>')
+            self.textField.setText(self.textField.text()+buttonValue)
+        self.answerField.setText(f'<h1>{self.operand + self.operator}</h1>')
 
 
 app = QApplication(sys.argv)
