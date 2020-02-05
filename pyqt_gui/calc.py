@@ -27,10 +27,10 @@ class MyWindow(QMainWindow):
                           '/': operator.truediv, '*': operator.mul}
         self.operand = ''
         self.operator = ''
-        self.setUI()
-        # self.setShortcuts()
+        self.initUI()
+        self.setShortcuts()
 
-    def setUI(self):
+    def initUI(self):
         # initialize widgets and layouts
         cenWidget = QWidget(self)
         vertLayout = QVBoxLayout(cenWidget)
@@ -53,12 +53,12 @@ class MyWindow(QMainWindow):
         # add buttons to grid layout
         self.buttonInstances = [QPushButton(item) for item in self.buttonsText]
         for i, button in enumerate(self.buttonInstances):
-            button.clicked.connect(partial(self.doMath, button.text()))
+            button.clicked.connect(partial(self.calculateValue, button.text()))
             gridLayout.addWidget(button, i//self.col_num, i % self.col_num)
 
         self.setCentralWidget(cenWidget)
 
-    def doMath(self, buttonValue):
+    def calculateValue(self, buttonValue):
         currentValue = self.textField.text()
         convertedValue = self.convertValue(currentValue)
         if buttonValue == 'c':
@@ -68,35 +68,34 @@ class MyWindow(QMainWindow):
         elif buttonValue == '.':
             if '.' not in currentValue:
                 self.textField.setText(currentValue+buttonValue)
-        elif (buttonValue in self.operators
+        elif (not self.operand and buttonValue in self.operators
               and convertedValue != None):
             self.operator = buttonValue
             self.operand = convertedValue
             self.textField.setText('')
-        elif (buttonValue == '=' and self.operator 
-              and convertedValue != None):
-            answer = f'''{self.operators[self.operator](
-                     self.operand, convertedValue)}'''
+        elif (buttonValue == '=' or buttonValue in self.operators 
+              and self.operator and convertedValue):
+            answer = self.operators[self.operator](
+                     self.operand, convertedValue)
             self.clearFields()
-            self.textField.setText(answer)
+            if buttonValue == '=':
+                self.textField.setText(f'{answer}')
+            else:
+                self.operand = answer
+                self.operator = buttonValue
         elif self.convertValue(buttonValue) != None:
             self.textField.setText(currentValue+buttonValue)
         
-        # self.textField.setFocus()
         self.hintField.setText(f'<h1><font color=#a0a0a0>{self.operand}' 
                                f'{self.operator}</font></h1>')
 
-    # def setShortcuts(self):
-    #     eqShort= QShortcut(QKeySequence('Enter'), self)
-    #     eqShort.activated.connect(partial(self.doMath, '='))
-    #     subShort= QShortcut(QKeySequence('-'), self)
-    #     subShort.activated.connect(partial(self.doMath, '-'))
-    #     sumShort= QShortcut(QKeySequence('+'), self)
-    #     sumShort.activated.connect(partial(self.doMath, '+'))
-    #     divShort= QShortcut(QKeySequence('/'), self)
-    #     divShort.activated.connect(partial(self.doMath, '/'))
-    #     mulShort= QShortcut(QKeySequence('*'), self)
-    #     mulShort.activated.connect(partial(self.doMath, '*'))
+    def setShortcuts(self):
+        eqShort= QShortcut(QKeySequence('Enter'), self)
+        eqShort.activated.connect(partial(self.calculateValue, '='))
+        for sign in self.buttonsText[1:5]:
+            short= QShortcut(QKeySequence(sign), self)
+            short.activated.connect(partial(self.calculateValue, sign))
+        
 
     def convertValue(self, value):
         try:
