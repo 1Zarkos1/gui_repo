@@ -1,6 +1,7 @@
 import random
 import pprint
 
+
 class BoardSet():
 
     def __init__(self, n_cols, n_rows, n_fact):
@@ -8,38 +9,52 @@ class BoardSet():
         self.n_rows = n_rows
         self.n_cells = n_cols*n_rows
         self.n_mines = int(n_fact * self.n_cells)
-        self.make_set()
+        self.make_set(self.n_cols, self.n_cells, self.n_mines)
 
-    def make_set(self):
-        rand_sam = random.sample(range(self.n_cells), k=self.n_mines)
-        self.flat_set = ['*' if i in rand_sam else '-' for i in range(self.n_cells)]
-        self.lists_set = [
-            self.flat_set[i : i+self.n_cols] for i in range(0,len(self.flat_set),self.n_cols)
+    def make_set(self, n_cols, n_cells, n_mines):
+        rand_sam = random.sample(range(n_cells), k=n_mines)
+        self.flat_board = [
+            '*' if i in rand_sam else '-' for i in range(n_cells)]
+        self.split_board = self.make_split_board(self.flat_board)
+
+    def make_split_board(self, board_list):
+        return [
+            board_list[i: i+self.n_cols]
+            for i in range(0, len(board_list), self.n_cols)
         ]
 
-    def get_cell_value(self, n):
-        if self.flat_set[n] is '*':
-            return '*'
-        else:  
-            col = n%self.n_cols
+    def get_adjacent_cells(self, n, whole_board):
+            col = n % self.n_cols
             row = n//self.n_rows
             prev_col = col - 1 if col > 0 else 0
             next_col = col + 2
-            mid = self.lists_set[row][prev_col:next_col]
+            mid = whole_board[row][prev_col:next_col]
             if row-1 < 0:
                 up = []
             else:
-                up = self.lists_set[row-1][prev_col:next_col]
-            if row+1 == len(self.lists_set):
+                up = whole_board[row-1][prev_col:next_col]
+            if row+1 == len(whole_board):
                 bot = []
             else:
-                bot = self.lists_set[row+1][prev_col:next_col]
-            
+                bot = whole_board[row+1][prev_col:next_col]
+
             comb_list = up + mid + bot
 
-            return str(comb_list.count('*'))
+            return comb_list
+
+    def get_cell_value(self, n):
+        if self.flat_board[n] == '*':
+            return '*'
+        else:
+            return str(self.get_adjacent_cells(n, self.split_board).count('*'))
 
     def get_set(self):
         open_set = list(map(self.get_cell_value, range(self.n_cells)))
-        open_set = [open_set[i : i+self.n_cols] for i in range(0,len(open_set),self.n_cols)]
-        return open_set    
+        open_set = [open_set[i: i+self.n_cols]
+            for i in range(0, len(open_set), self.n_cols)]
+        return open_set
+
+
+
+# b = BoardSet(10, 10, 0.2)
+# pprint.pprint(b.get_set())

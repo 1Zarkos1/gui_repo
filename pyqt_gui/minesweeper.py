@@ -16,12 +16,18 @@ EXIT_CODE_REBOOT = -123
 
 class MyWindow(QMainWindow):
     EXIT_CODE_REBOOT = -123
-    def __init__(self, parent=None):
+    def __init__(self, cols=10, rows=10, n_fact=0.2, parent=None):
         super(MyWindow, self).__init__(parent)
         self.setGeometry(800, 400, 10, 10)
         self.setWindowTitle('PyQt5 minesweeper')
-        self.board = BoardSet(10, 10, 0.2)
-
+        try:
+            self.board = BoardSet(int(cols), int(rows), float(n_fact))
+        except ValueError:
+            print('Please provide correct arguments for the game. (Number of '\
+                  'columns and rows as integers and percent of mines as '\
+                  'decimal value)')
+            sys.exit()
+        
         self.initUI()
 
     def initUI(self):
@@ -49,13 +55,13 @@ class MyWindow(QMainWindow):
     def open_button(self, button, i):
         if button.iconSize().height() < 19 and button.isEnabled():
             butt_text = self.board.get_cell_value(i)
-            if butt_text == '0':
-                self.open_chain_cells(i)
-            elif butt_text != '*':
+            if butt_text != '*':
                 button.setText(butt_text)
                 button.setEnabled(False)
                 button.setStyleSheet(
                     f'background-color: #c7c7c7; color: {self.button_colors[butt_text]}')
+                if butt_text == '0':
+                    self.open_chain_cells(i)
             else:
                 button.setIcon(QIcon('img/mine.png'))
                 button.setIconSize(QSize(19, 19))
@@ -63,9 +69,9 @@ class MyWindow(QMainWindow):
         self.check_win()
 
     def open_chain_cells(self, i):
-        slic = self.buttonInstances[i-10-1:i-10+2] + self.buttonInstances[i-1:i+2] \
-               + self.buttonInstances[i-10-1:i-10+2]
-        for inst in slic:
+        adjacent_cells = self.board.get_adjacent_cells(
+            i, self.board.make_split_board(self.buttonInstances))
+        for inst in adjacent_cells:
             if inst.isEnabled():
                 self.open_button(inst, self.buttonInstances.index(inst))
 
@@ -102,9 +108,12 @@ class MyWindow(QMainWindow):
 if __name__ == '__main__':
     while True:
         app = QApplication(sys.argv)
-        window = MyWindow()
+        try:
+            cmd_arg = sys.argv[1:]
+        except IndexError:
+            cmd_arg = []
+        window = MyWindow(*cmd_arg)
         window.show()
         a = app.exec_()
         if EXIT_CODE_REBOOT != a:
             break
-
