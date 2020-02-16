@@ -72,7 +72,7 @@ class MyWindow(QMainWindow):
             else:
                 for i, button in enumerate(self.buttonInstances):
                     if self.board.flat_board[i] == '*':
-                        button.setIcon(QIcon('img/mine.png'))
+                        button.setIcon(QIcon('../img/mine.png'))
                         button.setIconSize(QSize(19, 19))
                 self.display_end_message()
         self.check_win()
@@ -117,7 +117,7 @@ class MyWindow(QMainWindow):
         if button.isEnabled():
             size = button.iconSize().height()
             if size < 19:
-                button.setIcon(QIcon('img/flag.png'))
+                button.setIcon(QIcon('../img/flag.png'))
                 button.setIconSize(QSize(19, 19))
                 self.n_mines_left -= 1
                 self.minesCounter.setText((f'<h3>Mines left: {self.n_mines_left}</h3>'))
