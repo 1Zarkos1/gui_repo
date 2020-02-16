@@ -32,61 +32,68 @@ class MyWindow(QMainWindow):
         #     '4': '#0030ff', '5': '#7800ff', '6': '#04a800', '7': '#ab0081',
         #     '8': '#a8002f', '9': '#ff0000'
         # }
+        # defines central widget and vertical layout for it
         cenWidget = QWidget(self)
-        vertLayout = QVBoxLayout(cenWidget)
+        mainVertLayout = QVBoxLayout(cenWidget)
+        # defines grid widget and main field as group of buttons, styles them
+        # and adds to layout
         gridWidget = QWidget()
         gridLayout = QGridLayout(gridWidget)
         gridLayout.setSpacing(0)
         gridWidget.setLayout(gridLayout)
-
+        self.button_size = 20
         self.buttonInstances = [QPushButton()
                                 for num in range(self.rows*self.cols)]
         for i, button in enumerate(self.buttonInstances):
-            button.setFixedSize(20, 20)
+            button.setFixedSize(self.button_size, self.button_size)
             button.setStyleSheet('background-color: #4955ff;')
             button.installEventFilter(self)
-            # button.pressed.connect(partial(self.open_button, button, i))
             gridLayout.addWidget(button, i//self.cols, i % self.cols)
-
-        hLayWidg = QWidget(cenWidget)
-        hLay = QHBoxLayout()
+        # define horizontal widget and add combo box with label to choose
+        # algorithm
+        algWidg = QWidget(cenWidget)
+        algLayout = QHBoxLayout()
         self.comboBox = QComboBox()
         self.comboBox.addItem('BFS')
         self.comboBox.addItem('Dijkstra')
         self.comboBox.addItem('A*')
         self.comboBox.addItem('Best-first')
-        hLay.addWidget(QLabel('Choose an algorithm:'))
-        hLay.addWidget(self.comboBox)
-        hLayWidg.setLayout(hLay)
-
-        vertLayout.addWidget(gridWidget)
-        vertLayout.addWidget(hLayWidg)
-        vertLayout.setContentsMargins(0, 0, 0, 0)
-        vertLayout.setSpacing(0)
-
-        vertLayout.setAlignment(Qt.AlignCenter)
-
-        hLayWidg1 = QWidget(cenWidget)
-        hLay1 = QHBoxLayout()
+        algLayout.addWidget(QLabel('Choose an algorithm:'))
+        algLayout.addWidget(self.comboBox)
+        algWidg.setLayout(algLayout)
+        # add widgets to the main layout
+        mainVertLayout.addWidget(gridWidget)
+        mainVertLayout.addWidget(algWidg)
+        mainVertLayout.setContentsMargins(0, 0, 0, 0)
+        mainVertLayout.setSpacing(0)
+        mainVertLayout.setAlignment(Qt.AlignCenter)
+        # add label and checkbox for displaying cells processed during
+        # pathfinding
+        chBLayerWidg = QWidget(cenWidget)
+        checkBoxLayout = QHBoxLayout()
         self.chb = QCheckBox()
-        hLay1.addWidget(QLabel('Display search process?:'))
-        hLay1.addWidget(self.chb)
-        hLayWidg1.setLayout(hLay1)
-        vertLayout.addWidget(hLayWidg1)
-
-        hLayWidg2 = QWidget(cenWidget)
-        hLay2 = QHBoxLayout()
+        checkBoxLayout.addWidget(QLabel('Display search process?:'))
+        checkBoxLayout.addWidget(self.chb)
+        chBLayerWidg.setLayout(checkBoxLayout)
+        mainVertLayout.addWidget(chBLayerWidg)
+        # add functional buttons with horizontal layout
+        funcButtonsWidg = QWidget(cenWidget)
+        funcButtonsLayout = QHBoxLayout()
         startBut = QPushButton("Start")
         startBut.clicked.connect(self.doSearch)
+        clearBut = QPushButton("Clear")
+        clearBut.clicked.connect(self.clearField)
         stopBut = QPushButton("Exit")
         stopBut.clicked.connect(lambda x: sys.exit())
-        hLay2.addWidget(startBut)
-        hLay2.addWidget(stopBut)
-        hLayWidg2.setLayout(hLay2)
-        vertLayout.addWidget(hLayWidg2)
+        funcButtonsLayout.addWidget(startBut)
+        funcButtonsLayout.addWidget(clearBut)
+        funcButtonsLayout.addWidget(stopBut)
+        funcButtonsWidg.setLayout(funcButtonsLayout)
+        mainVertLayout.addWidget(funcButtonsWidg)
 
         self.setCentralWidget(cenWidget)
 
+    # defines what to do when certain mouse buttons are pressed on cells
     def eventFilter(self, obj, event):
         if event.type() == QEvent.MouseButtonPress:
             if event.button() == Qt.LeftButton:
@@ -98,46 +105,75 @@ class MyWindow(QMainWindow):
                     obj.setStyleSheet('background-color: #4955ff;')
             elif obj.isEnabled():
                 index = self.buttonInstances.index(obj)
-                row_col_ind = (index//self.cols, index % self.cols)
+                # index of buttosn in 2d array
+                rowColInd = (index//self.cols, index % self.cols)
                 imgs = ['../img/finish.png', '../img/start.png']
-                if row_col_ind != self.end and row_col_ind != self.start:
+                if rowColInd != self.end and rowColInd != self.start:
                     if event.button() == Qt.RightButton:
-                        self.set_start_end(obj, self.end, imgs[0], row_col_ind)
-                        self.end = row_col_ind
+                        self.setStartEndIcons(obj, self.end, imgs[0], rowColInd)
+                        self.end = rowColInd
                     else:
-                        self.set_start_end(
-                            obj, self.start, imgs[1], row_col_ind)
-                        self.start = row_col_ind
+                        self.setStartEndIcons(
+                            obj, self.start, imgs[1], rowColInd)
+                        self.start = rowColInd
         return QObject.event(obj, event)
 
-    def set_start_end(self, obj, point, img_ref, row_col_ind):
+    # set and del icons for start and end destination points
+    def setStartEndIcons(self, obj, point, img_ref, rowColInd):
         obj.setIcon(QIcon(img_ref))
-        obj.setIconSize(QSize(19, 19))
+        obj.setIconSize(QSize(self.button_size-2, self.button_size-2))
         if point:
             self.buttonInstances[
                 int(point[0]*self.cols+point[1])
             ].setIcon(QIcon())
 
+    # main function that defines searchClass object, and calls it's seatch
+    # method the calls function for showing founded path and, based on wheter or
+    # not user wants to see processed cells calls that function accordingly
     def doSearch(self):
-        array_maze = [
+        # check if start and end points are defined, if not display message
+        if not self.start or not self.end:
+            return QMessageBox.question(self, 'Start/end not defined',
+                                        'Please set up your start/end points\n'
+                                        '(use middle and rights buttons of the mouse)',
+                                        QMessageBox.Ok)
+        # translate maze from buttons to simple array
+        arrayMaze = [
             0 if button.isEnabled() else 1 for button in self.buttonInstances
         ]
-        sClass = SearchClass(array_maze, self.comboBox.currentText(), self.cols,
+        # create main working class and call it's search function
+        sClass = SearchClass(arrayMaze, self.comboBox.currentText(), self.cols,
                              self.start, self.end)
-        algorithms = {'BFS': sClass.bfs_search,
-                      'Dijkstra': sClass.dkstr_search,
-                      'A*': sClass.astar_search,
-                      'Best-first': sClass.bestfst_search}
-        algorithms[self.comboBox.currentText()]()
+        sClass.do_search()
 
+        # if user wants all cells processed by algorithm, by checking checkbox
+        # widget - display them
+        if self.chb.isChecked():
+            self.displayProcessedCells(sClass)
+
+        # display path if it's been found else print message that no path
+        # is found
         try:
-            self.show_final_path(sClass)
+            self.showPath(sClass)
         except KeyError:
-            QMessageBox.question(self, 'No path available',
-                        'There is no available path in current layout',
-                        QMessageBox.Ok)
+            QMessageBox.question(self, 'No path found',
+                                 'There is no available path in current layout',
+                                 QMessageBox.Ok)
 
-    def show_final_path(self, sClass):
+    # diplay cells processed by algorithm
+    def displayProcessedCells(self, sClass):
+        for coord in sClass.came_from.keys():
+            self.buttonInstances[coord[0]*self.cols+coord[1]].setStyleSheet(
+                'background-color:#00ff00')
+
+    # return field and variables to their initial states
+    def clearField(self):
+        self.initUI()
+        self.start = None
+        self.stop = None
+
+    # display path found by an algorithm
+    def showPath(self, sClass):
         ans = sClass.get_final_path()
         for coord in ans:
             self.buttonInstances[coord[0]*self.cols+coord[1]].setStyleSheet(
