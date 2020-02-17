@@ -1,15 +1,11 @@
-import operator
 import sys
-import os
-import random
-from functools import partial
 from searchAlg import SearchClass
 
 from PyQt5.QtWidgets import (QApplication, QShortcut, QLabel, QPushButton,
                              QGridLayout, QWidget, QMainWindow, QLineEdit,
                              QVBoxLayout, QLineEdit, QShortcut, QAction,
                              QMessageBox, QHBoxLayout, QComboBox, QCheckBox)
-from PyQt5.QtGui import QKeySequence, QDoubleValidator, QIcon
+from PyQt5.QtGui import QKeySequence, QIntValidator, QIcon
 from PyQt5.QtCore import QLocale, Qt, QEvent, QObject, QSize
 
 
@@ -17,7 +13,7 @@ class MyWindow(QMainWindow):
 
     def __init__(self, cols=20, rows=20, parent=None):
         super(MyWindow, self).__init__(parent)
-        self.setGeometry(800, 400, 4, 4)
+        self.setGeometry(400, 200, 4, 4)
         self.setWindowTitle('Pathfinder')
         self.cols = cols
         self.rows = rows
@@ -49,6 +45,18 @@ class MyWindow(QMainWindow):
             button.setStyleSheet('background-color: #4955ff;')
             button.installEventFilter(self)
             gridLayout.addWidget(button, i//self.cols, i % self.cols)
+
+        colRowWidg = QWidget(cenWidget)
+        colRowLayout = QHBoxLayout()
+        self.rowTextField = QLineEdit(f'{self.rows}')
+        self.colTextField = QLineEdit(f'{self.cols}')
+        self.rowTextField.setValidator(QIntValidator())
+        self.colTextField.setValidator(QIntValidator())
+        colRowLayout.addWidget(QLabel('Number of rows:'))
+        colRowLayout.addWidget(self.rowTextField)
+        colRowLayout.addWidget(QLabel('Number of columns:'))
+        colRowLayout.addWidget(self.colTextField)
+        colRowWidg.setLayout(colRowLayout)
         # define horizontal widget and add combo box with label to choose
         # algorithm
         algWidg = QWidget(cenWidget)
@@ -63,16 +71,17 @@ class MyWindow(QMainWindow):
         algWidg.setLayout(algLayout)
         # add widgets to the main layout
         mainVertLayout.addWidget(gridWidget)
+        mainVertLayout.addWidget(colRowWidg)
         mainVertLayout.addWidget(algWidg)
         mainVertLayout.setContentsMargins(0, 0, 0, 0)
         mainVertLayout.setSpacing(0)
-        mainVertLayout.setAlignment(Qt.AlignCenter)
+        mainVertLayout.setAlignment(Qt.AlignLeft)
         # add label and checkbox for displaying cells processed during
         # pathfinding
         chBLayerWidg = QWidget(cenWidget)
         checkBoxLayout = QHBoxLayout()
         self.chb = QCheckBox()
-        checkBoxLayout.addWidget(QLabel('Display search process?:'))
+        checkBoxLayout.addWidget(QLabel('Display processed cells?:'))
         checkBoxLayout.addWidget(self.chb)
         chBLayerWidg.setLayout(checkBoxLayout)
         mainVertLayout.addWidget(chBLayerWidg)
@@ -81,7 +90,7 @@ class MyWindow(QMainWindow):
         funcButtonsLayout = QHBoxLayout()
         startBut = QPushButton("Start")
         startBut.clicked.connect(self.doSearch)
-        clearBut = QPushButton("Clear")
+        clearBut = QPushButton("Reset")
         clearBut.clicked.connect(self.clearField)
         stopBut = QPushButton("Exit")
         stopBut.clicked.connect(lambda x: sys.exit())
@@ -168,6 +177,8 @@ class MyWindow(QMainWindow):
 
     # return field and variables to their initial states
     def clearField(self):
+        self.rows = int(self.rowTextField.text())
+        self.cols = int(self.colTextField.text())
         self.initUI()
         self.start = None
         self.stop = None
