@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (QApplication, QShortcut, QLabel, QPushButton,
                              QVBoxLayout, QShortcut, QAction, QMessageBox, 
                              QHBoxLayout, QComboBox, QCheckBox)
 from PyQt5.QtGui import QIntValidator, QIcon
-from PyQt5.QtCore import Qt, QObject
+from PyQt5.QtCore import Qt, QObject, QEvent
 
 
 class MyWindow(QMainWindow):
@@ -56,6 +56,7 @@ class MyWindow(QMainWindow):
                 else:
                     cell.setStyleSheet(self.textFieldCss+'color: #00f')
                     # cell.textChanged.connect(self.changeTypingColor)
+                cell.installEventFilter(self)
                 cell.setValidator(QIntValidator())
                 cell.setAlignment(Qt.AlignCenter)
                 cell.setMaxLength(1)
@@ -111,6 +112,24 @@ class MyWindow(QMainWindow):
         mainVertLayout.addWidget(funcButtonsWidg)
 
         self.setCentralWidget(cenWidget)
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.KeyPress:
+            for i, row in enumerate(self.textFields):
+                for k, cell in enumerate(row):
+                    if cell.hasFocus():
+                        curRow = i
+                        curCell = k
+            if event.key() == Qt.Key_Up:
+                if curRow >= 1: self.textFields[curRow-1][curCell].setFocus()
+            elif event.key() == Qt.Key_Down:
+                if curRow <= 7: self.textFields[curRow+1][curCell].setFocus()
+            elif event.key() == Qt.Key_Left:
+                if curCell >= 1: self.textFields[curRow][curCell-1].setFocus()
+            elif event.key() == Qt.Key_Right:
+                if curCell <= 7: self.textFields[curRow][curCell+1].setFocus()
+
+        return QObject.event(obj, event)
 
     # function for setting own initial sudokus by typing numbers into fields
     def createOwnSudoku(self):
