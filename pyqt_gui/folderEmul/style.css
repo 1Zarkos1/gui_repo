@@ -1,0 +1,23 @@
+QMainWindow {
+
+}
+
+QLabel {
+    color: black;
+    font-size: 12px;
+    background-color: none;
+}
+
+QLabel[selected=true] {
+    color: #fff;
+    background-color: blue;
+}
+
+QPushButton {
+    display: inline-block;
+    background-color: none;
+    border: none;
+    box-shadow: none;
+    width: 25px;
+    height: 25px;
+}
