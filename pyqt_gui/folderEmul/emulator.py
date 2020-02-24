@@ -2,7 +2,6 @@ import sys
 import os
 from functools import partial
 
-
 from PyQt5.QtWidgets import (QApplication, QShortcut, QLabel, QPushButton,
                              QGridLayout, QWidget, QMainWindow, QLineEdit,
                              QVBoxLayout, QShortcut, QAction, QMessageBox,
@@ -17,10 +16,12 @@ class MyWindow(QMainWindow):
         super(MyWindow, self).__init__(parent)
         self.setGeometry(600, 300, 700, 500)
         self.setWindowTitle('Folder imitator')
-        self.homeDirectory = 'E:\\'
+        self.homeDirectory = os.path.splitdrive(os.getcwd())[0]+'\\'
         self.currentDirectory = self.homeDirectory
         self.setStyleSheet(open('style.css').read())
-
+        
+        self.dirStack = [self.homeDirectory]
+        self.depthLevel = len(self.dirStack)
         self.initUI()
 
     def initUI(self):
@@ -68,16 +69,22 @@ class MyWindow(QMainWindow):
         self.setCentralWidget(cenWidget)
 
     def getDirList(self):
-        return os.listdir(self.currentDirectory)
+        return sorted(os.listdir(self.currentDirectory), 
+            key=lambda x : 1 if os.path.isdir(os.path.join(
+            self.currentDirectory, x)) and not x.endswith('.BIN') else 2)
 
     def navigate(self, action):
         if action == 'back':
             if self.currentDirectory != self.homeDirectory:
                 self.currentDirectory = os.path.split(self.currentDirectory)[0]
+                self.depthLevel -= 1
+                print(self.depthLevel, self.dirStack)
         elif action == 'forward':
-            pass
+            if len(self.dirStack) > self.depthLevel:
+                self.openPath(self.dirStack[self.depthLevel])
+                print(self.depthLevel, self.dirStack)
         elif action == 'home':
-            self.currentDirectory = self.homeDirectory
+            self.openPath(self.homeDirectory)
         self.initUI()
 
     def eventFilter(self, obj, event):
@@ -102,7 +109,15 @@ class MyWindow(QMainWindow):
         if os.path.exists(path):
             if os.path.isfile(path):
                 os.startfile(path)
-            else:
+            elif self.currentDirectory != path:
+                print(self.depthLevel, self.dirStack)
+                try:
+                    if self.dirStack[self.depthLevel] != path:
+                        self.dirStack[self.depthLevel:] = [path]
+                except IndexError:
+                    self.dirStack.append(path)
+                self.depthLevel += 1
+                print(self.depthLevel, self.dirStack)
                 self.currentDirectory = path
                 self.initUI()
 
