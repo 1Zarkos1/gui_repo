@@ -16,7 +16,7 @@ class MyWindow(QMainWindow):
         super(MyWindow, self).__init__(parent)
         self.setGeometry(600, 300, 700, 500)
         self.setWindowTitle('Folder imitator')
-        self.homeDirectory = os.path.splitdrive(os.getcwd())[0]+'\\'
+        self.homeDirectory = os.path.splitdrive(os.getcwd())[0]+os.path.sep
         self.currentDirectory = self.homeDirectory
         self.setStyleSheet(open('style.css').read())
         
@@ -78,11 +78,9 @@ class MyWindow(QMainWindow):
             if self.currentDirectory != self.homeDirectory:
                 self.currentDirectory = os.path.split(self.currentDirectory)[0]
                 self.depthLevel -= 1
-                print(self.depthLevel, self.dirStack)
         elif action == 'forward':
             if len(self.dirStack) > self.depthLevel:
                 self.openPath(self.dirStack[self.depthLevel])
-                print(self.depthLevel, self.dirStack)
         elif action == 'home':
             self.openPath(self.homeDirectory)
         self.initUI()
@@ -110,14 +108,12 @@ class MyWindow(QMainWindow):
             if os.path.isfile(path):
                 os.startfile(path)
             elif self.currentDirectory != path:
-                print(self.depthLevel, self.dirStack)
                 try:
                     if self.dirStack[self.depthLevel] != path:
                         self.dirStack[self.depthLevel:] = [path]
                 except IndexError:
                     self.dirStack.append(path)
                 self.depthLevel += 1
-                print(self.depthLevel, self.dirStack)
                 self.currentDirectory = path
                 self.initUI()
 
