@@ -1,0 +1,36 @@
+QMainWindow {
+    background-color: slategray;
+    border: none;
+}
+
+QPushButton#toolBut {
+    background-color: none;
+    border: 1px solid white;
+    padding: 5px;
+    border-radius: 5px;
+    color: white;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+QPushButton#toolBut:hover {
+    background-color: black;
+}
+
+QLabel#MainWidget {
+    font-weight: bold;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 30px;
+    color: white;
+}
+
+QTimeEdit {
+    color: white;
+    font-weight: bold;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 30px;
+    background-color: rgba(0, 0, 0, 0);
+    border: none;
+    text-align: center;
+}
