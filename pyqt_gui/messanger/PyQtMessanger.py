@@ -19,19 +19,29 @@ class SocketWork(QObject):
 
     def __init__(self, userType, name, host, port):
         super().__init__()
+        # variables for app
         self.type = userType
         self.name = name
+        # list of currently connected users
+        self.userList = {}
+        # messages to send
+        self.pendingMessages = []
+        # state of instanse
+        self.run = True
+        # message encoding used in app
+        self.encoding = 'utf-8'
+        # list of users who needs to receive list of current users (upon 
+        # connecting)
+        self.sendUserListTo = []
+
+        # initialize selector
         self.sel = selectors.DefaultSelector()
         self.host, self.port = host, port
         self.lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.userList = {}
-        self.pendingMessages = []
-        self.run = True
-        self.encoding = 'utf-8'
-        self.sendUserListTo = []
 
     @pyqtSlot()
     def startConnection(self):
+        # set server or connect to it depending on the type of user
         if self.type == 'server':
             self.lsock.bind((self.host, self.port))
             self.lsock.listen(3)
@@ -46,12 +56,17 @@ class SocketWork(QObject):
             while self.run:
                 events = self.sel.select()
                 for key, mask in events:
+                    # if server socket if ready for use accept user trying to 
+                    # connect
                     if key.data == 'Server':
                         self.acceptUser(key.fileobj)
+                    # if user already connected communicate with him
                     else:
                         result = self.communicate(key, mask)
                         if result == 'received':
                             break
+                # if loop finished without any break e.g. message was sent to 
+                # all users - remove message from waiting list
                 else:
                     if self.pendingMessages:
                         self.pendingMessages.pop(0)
@@ -64,6 +79,8 @@ class SocketWork(QObject):
         finally:
             pass
 
+    # function for safely closing connections, either connection that is 
+    # supplied to function or all available connections
     def closeConnection(self, sock=None):
         if sock == None or self.type != 'server':
             while self.sel.get_map() and len(self.sel.get_map()) > 1:
@@ -190,6 +207,7 @@ class SocketWork(QObject):
 
 class MyWindow(QMainWindow):
 
+    # signal to begin running socket object
     startSign = pyqtSignal()
 
     def __init__(self, userType, name, host, port, parent=None):
@@ -200,7 +218,8 @@ class MyWindow(QMainWindow):
         # self.setStyleSheet(open('style.css').read())
         self.name = name
         self.type = userType
-
+        # initialize socket object and thread object, add socket object to 
+        # thread and add neccessary signals 
         self.soket = SocketWork(userType, name, host, port)
         self.threadWork = QThread()
         self.threadWork.start()
@@ -209,18 +228,19 @@ class MyWindow(QMainWindow):
         self.soket.usersChanged.connect(self.showUserList)
         self.startSign.connect(self.soket.startConnection)
         self.startSign.emit()
-
+        # add current user to userlist
         self.soket.userList[(host, port)] = name
 
         self.initUI()
 
     def initUI(self):
+        # main layout and central widget
         cenWidget = QWidget(self)
         self.mainVertLayout = QVBoxLayout(cenWidget)
         self.mainVertLayout.setSpacing(0)
         self.mainVertLayout.setContentsMargins(1, 1, 1, 1)
         self.mainVertLayout.addWidget(QLabel('Chat messages:'))
-
+        # area for displaying messages
         self.messageScroll = QScrollArea()
         self.messageScroll.setWidgetResizable(True)
         self.messageScroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -233,10 +253,11 @@ class MyWindow(QMainWindow):
         self.chatLay.setContentsMargins(3, 3, 3, 3)
         self.messageScroll.setWidget(butWidg)
         self.mainVertLayout.addWidget(self.messageScroll)
-
+        # message input and 'send' button
         butWidg = QWidget()
         butLay = QHBoxLayout(butWidg)
         self.messageInput = QLineEdit(butWidg)
+        self.messageInput.setPlaceholderText('Your message')
         self.messageInput.returnPressed.connect(self.queueMessage)
         butLay.addWidget(self.messageInput)
         butLay.addWidget(QPushButton('Send', clicked=self.queueMessage))
@@ -244,7 +265,8 @@ class MyWindow(QMainWindow):
         butLay.setSpacing(2)
         butLay.setContentsMargins(1, 1, 1, 1)
         self.mainVertLayout.addWidget(butWidg)
-
+        # checkbox for displaying user list and buttons for message styling 
+        # (in dev)
         checkWidg = QWidget()
         checkLay = QHBoxLayout(checkWidg)
         self.showUsersCheckBox = QCheckBox(checkWidg)
@@ -259,10 +281,14 @@ class MyWindow(QMainWindow):
 
         self.setCentralWidget(cenWidget)
 
+    # function that depending on where user was focused before message was added
+    # scroll to last messages (if focus was on last message) or leaves window
+    # without scrolling
     def changeScrollFocus(self):
         if self.focusOnBottom:
             self.messageScrollBar.setValue(self.messageScrollBar.maximum())
 
+    # adds message to queue (list) for sending and sets input to blank 
     def queueMessage(self):
         if self.messageInput.text():
             message = {'name': self.name,
@@ -272,6 +298,7 @@ class MyWindow(QMainWindow):
             self.soket.pendingMessages.append(message)
             self.messageInput.setText('')
 
+    # adds message to main window message view
     def addMessage(self, message):
         messageWidget = QLabel(f'<b>{message["name"]} <i>at {message["time"]}:</b><br>'
                                f'{message["text"]}')
@@ -281,32 +308,47 @@ class MyWindow(QMainWindow):
             messageWidget.setStyleSheet('color: green;')
         if message['text'].startswith(f'@{self.name}, '):
             messageWidget.setStyleSheet('color: red;')
+        # check where user is focused (for changeScrollFocus method)
         self.focusOnBottom = (self.messageScrollBar.value() ==
                               self.messageScrollBar.maximum())
         self.chatLay.addWidget(messageWidget)
 
+    # adds userlist from window depending on state of respective checkbox
     def showUserList(self):
         self.hideUserList()
         print('signal received')
         if self.showUsersCheckBox.isChecked():
-            self.scrolli = QScrollArea()
-            self.scrolli.setWidgetResizable(True)
-            self.scrolli.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            self.userListScroll = QScrollArea()
+            self.userListScroll.setWidgetResizable(True)
+            self.userListScroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             butWidg = QWidget()
             chatLay = QVBoxLayout(butWidg)
             chatLay.setAlignment(Qt.AlignTop)
             chatLay.setSpacing(2)
             chatLay.setContentsMargins(2, 2, 2, 2)
             for userName in self.soket.userList.values():
-                chatLay.addWidget(QLabel(f'{userName}'))
-            self.scrolli.setWidget(butWidg)
-            self.mainVertLayout.addWidget(self.scrolli)
+                user = QLabel(f'{userName}')
+                user.installEventFilter(self)
+                chatLay.addWidget(user)
+            self.userListScroll.setWidget(butWidg)
+            self.mainVertLayout.addWidget(self.userListScroll)
 
+    # adds functionality to address user by clicking his name in userList
+    # without the need to type his name by hand
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.MouseButtonPress:
+            if event.button() == Qt.LeftButton and type(obj) == QLabel:
+                self.messageInput.setText(f'@{obj.text()}, ' 
+                                          + self.messageInput.text())
+        return QObject.event(obj, event)
+
+    # removes userlist from window depending on state of respective checkbox
     def hideUserList(self):
-        if hasattr(self, 'scrolli'):
-            self.scrolli.setParent(None)
-            del self.scrolli 
+        if hasattr(self, 'userListScroll'):
+            self.userListScroll.setParent(None)
+            del self.userListScroll 
 
+    # operations to do when window is closed
     def closeEvent(self, event):
         print('closing programm')
         self.soket.closeConnection()
@@ -316,10 +358,10 @@ class MyWindow(QMainWindow):
 if __name__ == '__main__':
     try:
         app = QApplication(sys.argv)
-        # run the code first with given parameters then chage 'server' to
-        # something else, change username and run again
+        # run the code first with first line ('server') then comment it, 
+        # uncomment secons line ('user') and run again
         # window = MyWindow('server', 'Server', '127.0.0.1', 65530)
-        window = MyWindow('serve1r2', 'Seerver3R1', '127.0.0.1', 65530)
+        window = MyWindow('user', 'User1', '127.0.0.1', 65530)
         window.show()
         sys.exit(app.exec_())
 
