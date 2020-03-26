@@ -7,7 +7,7 @@ import traceback
 
 from PyQt5.QtWidgets import (QApplication, QLabel, QPushButton, QWidget,
                              QMainWindow, QLineEdit, QVBoxLayout, QHBoxLayout,
-                             QScrollArea, QTimeEdit, QCheckBox)
+                             QScrollArea, QTimeEdit, QCheckBox, QTextEdit, QAbstractScrollArea)
 from PyQt5.QtGui import QIntValidator, QIcon
 from PyQt5.QtCore import Qt, QObject, QEvent, QSize, pyqtSignal, pyqtSlot, QThread
 
@@ -83,7 +83,9 @@ class SocketWork(QObject):
     # supplied to function or all available connections
     def closeConnection(self, sock=None):
         if sock == None or self.type != 'server':
-            while self.sel.get_map() and len(self.sel.get_map()) > 1:
+            while ((self.sel.get_map() and len(self.sel.get_map()) > 1)
+                    or (self.type != 'server' and self.sel.get_map() 
+                    and len(self.sel.get_map()) > 0)):
                 events = self.sel.select()
                 for key, mask in events:
                     if selectors.EVENT_WRITE and mask:
@@ -99,6 +101,8 @@ class SocketWork(QObject):
             sock.close()
             return '_quit'
 
+    # change message type between bytes and dict before sending or after 
+    # receiveing message
     def translateMessage(self, message):
         if type(message) == bytes:
             message = json.loads(message.decode(self.encoding))
@@ -106,15 +110,21 @@ class SocketWork(QObject):
             message = json.dumps(message).encode(self.encoding)
         return message
 
+    # accept new user and store it's socket in selectors
     def acceptUser(self, sock):
         conn, _ = sock.accept()
         conn.setblocking(False)
         events = selectors.EVENT_READ | selectors.EVENT_WRITE
         self.sel.register(conn, events, data='_client')
 
+    # method that receives system messages based on header 
+    # (if header is not numerical)
     def receiveSysMessage(self, sock, header):
+        # receives quit message send by user or server and closes certain socket
         if header == '_quit':
+            print('quit message received')
             return self.closeConnection(sock)
+        # receives name of user that connects to a server
         elif header == '_name':
             if self.type == 'server':
                 sock.setblocking(True)
@@ -132,6 +142,7 @@ class SocketWork(QObject):
                     self.userList[userAddress] = username
                     self.sendUserListTo.append(userAddress)
                     self.usersChanged.emit()
+        # receives userlist from server
         elif header == 'users' and self.type != 'server':
             sock.setblocking(True)
             print(f'its header {header}')
@@ -146,10 +157,13 @@ class SocketWork(QObject):
 
     def sendSysMessage(self, sock, header):
         userAddress = sock.getpeername()
+        # adds connected user to userlist and sends message asking to provide 
+        # a username
         if self.type == 'server' and userAddress not in self.userList:
             sock.send('_name'.encode(self.encoding))
             self.userList[userAddress] = None
             print('ask message send')
+        # sends username to server upon receiving asking header - "_name"
         elif self.type != 'server' and header == '_name':
             name = self.name.encode(self.encoding)
             print('sending _name')
@@ -159,6 +173,8 @@ class SocketWork(QObject):
             print('sending name')
             sock.send(name)
             print('name send')
+        # sends to user, that was connected and stored in 'self.sendUserListTo',
+        # current userlist and removes that user from waiting list
         elif (self.sendUserListTo != [] and self.sendUserListTo[0] 
                 == userAddress):
             print(f' hey its me {list(self.userList.values())}')
@@ -176,26 +192,35 @@ class SocketWork(QObject):
     def communicate(self, key, mask):
         sock = key.fileobj
         receivedHeader = ''
-        if mask & selectors.EVENT_READ:
+        if mask & selectors.EVENT_READ and not self.pendingMessages:
             header = sock.recv(5)
             if header:
                 receivedHeader = header.decode(self.encoding)
+                # if header is numeric that means that it is header with message 
+                # length and message can be received after
                 if receivedHeader.isnumeric():
                     sock.setblocking(True)
                     message = self.translateMessage(
                         sock.recv(int(receivedHeader)))
                     sock.setblocking(False)
                     self.messageSignal.emit(message)
+                    # if message was received stop and return from current 
+                    # function to stop iteration and start it again to send 
+                    # received message to users
                     if self.type == 'server':
                         self.pendingMessages.append(message)
                         return 'received'
+                # if header received was alphabetical that means that it is 
+                # system message and should be processed accordingly
                 else:
                     result = self.receiveSysMessage(sock, receivedHeader)
                     if result == '_quit':
                         return
 
         if mask & selectors.EVENT_WRITE:
+            # send system message if needed
             self.sendSysMessage(sock, receivedHeader)
+            # if there is message waiting to be send - send it
             if self.pendingMessages:
                 message = self.pendingMessages[0]
                 if (self.type != 'server' or message['name'] 
@@ -215,9 +240,10 @@ class MyWindow(QMainWindow):
         self.setGeometry(600, 300, 400, 500)
         self.setWindowTitle(f'PyQT messanger - as {name}')
         self.setWindowIcon(QIcon('../img/message.png'))
-        # self.setStyleSheet(open('style.css').read())
+        self.setStyleSheet(open('style.css').read())
         self.name = name
         self.type = userType
+        self.selection = ''
         # initialize socket object and thread object, add socket object to 
         # thread and add neccessary signals 
         self.soket = SocketWork(userType, name, host, port)
@@ -265,14 +291,26 @@ class MyWindow(QMainWindow):
         butLay.setSpacing(2)
         butLay.setContentsMargins(1, 1, 1, 1)
         self.mainVertLayout.addWidget(butWidg)
+
         # checkbox for displaying user list and buttons for message styling 
-        # (in dev)
         checkWidg = QWidget()
         checkLay = QHBoxLayout(checkWidg)
         self.showUsersCheckBox = QCheckBox(checkWidg)
         self.showUsersCheckBox.stateChanged.connect(self.showUserList)
         checkLay.addWidget(self.showUsersCheckBox)
         checkLay.addWidget(QLabel('Show user list'))
+        
+        styleButtons = [
+            ('Bold', '../img/bold.png'), ('Italic', '../img/italic.png')
+        ]
+        for name, ref in styleButtons:
+            button = QPushButton(name, clicked=lambda: 
+                                self.addStyles(name[0].lower()))
+            button.setObjectName('styleButton')
+            button.setIcon(QIcon(ref))
+            button.setFocusPolicy(Qt.NoFocus)
+            checkLay.addWidget(button)
+
         checkLay.setAlignment(Qt.AlignLeft)
         checkWidg.setLayout(checkLay)
         butLay.setSpacing(2)
@@ -288,6 +326,19 @@ class MyWindow(QMainWindow):
         if self.focusOnBottom:
             self.messageScrollBar.setValue(self.messageScrollBar.maximum())
 
+    # add bold and italic style tags to message
+    def addStyles(self, sign):
+        selectedText = self.messageInput.selectedText()
+        if selectedText:
+            text = self.messageInput.text()
+            start = self.messageInput.selectionStart()
+            end = self.messageInput.selectionEnd()
+            fullMessage = f'{text[0:start]}<{sign}>{selectedText}</{sign}>'\
+                          f'{text[end:len(text)]}'
+            self.messageInput.setText(fullMessage)
+        else:
+            self.messageInput.insert(f'<{sign}></{sign}>')
+    
     # adds message to queue (list) for sending and sets input to blank 
     def queueMessage(self):
         if self.messageInput.text():

@@ -1,0 +1,26 @@
+QPushButton#styleButton {
+    background-color: lightgrey;
+    border: None;
+    padding: 1px 5px;
+    border: 1px solid grey;
+    border-radius: 5px;
+    margin-left: 5px;
+}
+
+QPushButton#styleButton:hover {
+    background-color: darkgrey;
+}
+
+QPushButton#styleButton:pressed {
+    background-color: grey;
+}
+
+QLineEdit {
+    border-radius: 5px;
+    padding: 2px;
+    border: 1px solid grey;
+}
+
+QLineEdit:focus{
+    border: 1px solid skyblue;
+}
