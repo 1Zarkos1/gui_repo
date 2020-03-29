@@ -4,12 +4,14 @@ import socket
 import selectors
 import json
 import traceback
+import functools
 
 from PyQt5.QtWidgets import (QApplication, QLabel, QPushButton, QWidget,
                              QMainWindow, QLineEdit, QVBoxLayout, QHBoxLayout,
-                             QScrollArea, QTimeEdit, QCheckBox, QTextEdit, QAbstractScrollArea)
+                             QScrollArea, QTimeEdit, QCheckBox)
 from PyQt5.QtGui import QIntValidator, QIcon
-from PyQt5.QtCore import Qt, QObject, QEvent, QSize, pyqtSignal, pyqtSlot, QThread
+from PyQt5.QtCore import (Qt, QObject, QEvent, QSize, pyqtSignal, pyqtSlot, 
+                          QThread)
 
 
 class SocketWork(QObject):
@@ -72,9 +74,7 @@ class SocketWork(QObject):
                         self.pendingMessages.pop(0)
         except Exception as excp:
             *_, tb = sys.exc_info()
-            print('before traceback')
             traceback.print_tb(tb)
-            print("caught keyboard interrupt, exiting")
             print(excp)
         finally:
             pass
@@ -122,7 +122,6 @@ class SocketWork(QObject):
     def receiveSysMessage(self, sock, header):
         # receives quit message send by user or server and closes certain socket
         if header == '_quit':
-            print('quit message received')
             return self.closeConnection(sock)
         # receives name of user that connects to a server
         elif header == '_name':
@@ -131,13 +130,9 @@ class SocketWork(QObject):
                 lenHeader = int(sock.recv(5).decode(self.encoding))
                 username = sock.recv(lenHeader).decode(self.encoding)
                 sock.setblocking(False)
-                print(username, self.userList.values())
                 if username in self.userList.values():
-                    print('unreg.host')
                     self.closeConnection(sock)
-                    print('signal emmited')
                 else:
-                    print(f'received {username}')
                     userAddress = sock.getpeername()
                     self.userList[userAddress] = username
                     self.sendUserListTo.append(userAddress)
@@ -145,14 +140,10 @@ class SocketWork(QObject):
         # receives userlist from server
         elif header == 'users' and self.type != 'server':
             sock.setblocking(True)
-            print(f'its header {header}')
             lenHeader = int(sock.recv(5).decode(self.encoding))
-            print(f'its lenHeader {lenHeader}')
             userList = self.translateMessage(sock.recv(lenHeader))
-            print(f'its userList {userList}')
             sock.setblocking(False)
             self.userList = {i:value for i, value in enumerate(userList)}
-            print('emit for users')
             self.usersChanged.emit()
 
     def sendSysMessage(self, sock, header):
@@ -162,31 +153,22 @@ class SocketWork(QObject):
         if self.type == 'server' and userAddress not in self.userList:
             sock.send('_name'.encode(self.encoding))
             self.userList[userAddress] = None
-            print('ask message send')
         # sends username to server upon receiving asking header - "_name"
         elif self.type != 'server' and header == '_name':
             name = self.name.encode(self.encoding)
-            print('sending _name')
             sock.send('_name'.encode(self.encoding))
-            print('sending header')
             sock.send(f"{len(name):05}".encode(self.encoding))
-            print('sending name')
             sock.send(name)
-            print('name send')
         # sends to user, that was connected and stored in 'self.sendUserListTo',
         # current userlist and removes that user from waiting list
         elif (self.sendUserListTo != [] and self.sendUserListTo[0] 
                 == userAddress):
-            print(f' hey its me {list(self.userList.values())}')
             currentUsers = self.translateMessage(list(self.userList.values()))
-            print(currentUsers.decode(self.encoding))
             sock.setblocking(True)
             sock.send('users'.encode(self.encoding))
             sock.send(f"{len(currentUsers):05}".encode(self.encoding))
-            print('sending name')
             sock.send(currentUsers)
             sock.setblocking(False)
-            print('name send')
             self.sendUserListTo.pop(0)
 
     def communicate(self, key, mask):
@@ -304,8 +286,8 @@ class MyWindow(QMainWindow):
             ('Bold', '../img/bold.png'), ('Italic', '../img/italic.png')
         ]
         for name, ref in styleButtons:
-            button = QPushButton(name, clicked=lambda: 
-                                self.addStyles(name[0].lower()))
+            button = QPushButton(name, clicked=functools.partial( 
+                                self.addStyles, name[0].lower()))
             button.setObjectName('styleButton')
             button.setIcon(QIcon(ref))
             button.setFocusPolicy(Qt.NoFocus)
@@ -367,7 +349,6 @@ class MyWindow(QMainWindow):
     # adds userlist from window depending on state of respective checkbox
     def showUserList(self):
         self.hideUserList()
-        print('signal received')
         if self.showUsersCheckBox.isChecked():
             self.userListScroll = QScrollArea()
             self.userListScroll.setWidgetResizable(True)
@@ -401,10 +382,8 @@ class MyWindow(QMainWindow):
 
     # operations to do when window is closed
     def closeEvent(self, event):
-        print('closing programm')
         self.soket.closeConnection()
         self.threadWork.quit()
-        print(self.soket.userList)
 
 if __name__ == '__main__':
     try:
